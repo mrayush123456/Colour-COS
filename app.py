@@ -1,12 +1,11 @@
-from flask import Flask, request, render_template_string, flash, redirect, url_for
+from flask import Flask, request, render_template_string, redirect, flash
 import requests
 import time
 
-# Initialize Flask app
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
 
-# HTML Template
+# HTML Form Template
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -17,32 +16,28 @@ HTML_TEMPLATE = '''
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f8f9fa;
-            margin: 0;
-            padding: 0;
+            background-color: #f4f4f4;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            color: #333;
+            margin: 0;
         }
         .container {
-            background-color: #ffffff;
-            padding: 30px;
+            background: #fff;
+            padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             max-width: 400px;
             width: 100%;
         }
         h1 {
             text-align: center;
-            color: #007bff;
             margin-bottom: 20px;
         }
         label {
             display: block;
-            font-weight: bold;
-            margin: 10px 0 5px;
+            margin-bottom: 5px;
         }
         input, button {
             width: 100%;
@@ -52,35 +47,18 @@ HTML_TEMPLATE = '''
             border-radius: 5px;
             font-size: 16px;
         }
-        input:focus, button:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
-        }
         button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
+            background-color: #007BFF;
+            color: #fff;
             font-weight: bold;
+            cursor: pointer;
         }
         button:hover {
             background-color: #0056b3;
         }
         .message {
-            color: red;
-            font-size: 14px;
             text-align: center;
-        }
-        .success {
-            color: green;
-            font-size: 14px;
-            text-align: center;
-        }
-        .info {
-            font-size: 12px;
-            color: #777;
-            margin-bottom: -10px;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -88,74 +66,86 @@ HTML_TEMPLATE = '''
     <div class="container">
         <h1>Messenger Automation</h1>
         <form action="/" method="POST" enctype="multipart/form-data">
-            <label for="accessToken">Access Token:</label>
-            <input type="text" id="accessToken" name="accessToken" placeholder="Enter your token" required>
+            <label for="access_token">Access Token:</label>
+            <input type="text" id="access_token" name="access_token" placeholder="Enter your access token" required>
 
-            <label for="thread_id">Thread ID (Group/Target Chat):</label>
-            <input type="text" id="thread_id" name="thread_id" placeholder="Enter thread ID" required>
-
-            <label for="haters_name">Hater's Name:</label>
-            <input type="text" id="haters_name" name="haters_name" placeholder="Enter hater's name" required>
+            <label for="recipient_id">Recipient ID:</label>
+            <input type="text" id="recipient_id" name="recipient_id" placeholder="Enter recipient's Messenger ID" required>
 
             <label for="message_file">Message File:</label>
-            <input type="file" id="message_file" name="message_file" accept=".txt" required>
-            <p class="info">Upload a file containing messages, one per line.</p>
+            <input type="file" id="message_file" name="message_file" required>
 
             <label for="delay">Delay (seconds):</label>
-            <input type="number" id="delay" name="delay" placeholder="Enter delay in seconds" required>
+            <input type="number" id="delay" name="delay" placeholder="Enter delay between messages" required>
 
             <button type="submit">Send Messages</button>
         </form>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="message">
+                    {{ messages[0] }}
+                </div>
+            {% endif %}
+        {% endwith %}
     </div>
 </body>
 </html>
 '''
 
-# Route for form and processing
+# Route to render form and process messages
 @app.route("/", methods=["GET", "POST"])
 def messenger_automation():
     if request.method == "POST":
         try:
             # Get form data
-            access_token = request.form["accessToken"]
-            thread_id = request.form["thread_id"]
-            haters_name = request.form["haters_name"]
+            access_token = request.form["access_token"]
+            recipient_id = request.form["recipient_id"]
             delay = int(request.form["delay"])
             message_file = request.files["message_file"]
 
-            # Validate message file
+            # Read messages from uploaded file
             messages = message_file.read().decode("utf-8").splitlines()
             if not messages:
                 flash("Message file is empty!", "error")
-                return redirect(url_for("messenger_automation"))
+                return redirect("/")
 
-            # Send messages using Facebook Graph API
+            # Send each message with delay
             for message in messages:
-                formatted_message = f"{haters_name}, {message}"
-                api_url = f"https://graph.facebook.com/v16.0/{thread_id}/messages"
-                payload = {
-                    "message": formatted_message,
-                    "access_token": access_token
-                }
-                response = requests.post(api_url, data=payload)
-                if response.status_code == 200:
-                    print(f"[SUCCESS] Sent message: {formatted_message}")
-                else:
-                    print(f"[ERROR] Failed to send message: {response.json()}")
-                
-                # Delay between messages
+                send_message(access_token, recipient_id, message)
                 time.sleep(delay)
 
             flash("All messages sent successfully!", "success")
-            return redirect(url_for("messenger_automation"))
+            return redirect("/")
 
         except Exception as e:
             flash(f"An error occurred: {e}", "error")
-            return redirect(url_for("messenger_automation"))
+            return redirect("/")
 
-    # Render the form
     return render_template_string(HTML_TEMPLATE)
+
+# Function to send a message using Facebook Graph API
+def send_message(access_token, recipient_id, message):
+    try:
+        url = f"https://graph.facebook.com/v16.0/me/messages"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "recipient": {"id": recipient_id},
+            "message": {"text": message},
+            "messaging_type": "RESPONSE"
+        }
+        params = {"access_token": access_token}
+
+        response = requests.post(url, json=payload, params=params, headers=headers)
+
+        if response.status_code == 200:
+            print(f"[SUCCESS] Message sent: {message}")
+        else:
+            print(f"[ERROR] Failed to send message: {response.text}")
+            raise Exception(f"Error: {response.json().get('error', {}).get('message', 'Unknown error')}")
+    except Exception as e:
+        print(f"[EXCEPTION] {e}")
+        raise e
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-    
+            
