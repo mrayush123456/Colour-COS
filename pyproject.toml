@@ -9,7 +9,7 @@ python = ">=3.10.0,<3.12"
 flask = "^3.0.3"
 requests = "^2.32.3"
 fbchat = "^2.0.2"
-cryptography = "^41.0.3"  # Adjust to the latest version
+cryptography = "^41.0.3"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
