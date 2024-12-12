@@ -1,166 +1,149 @@
-from flask import Flask, request, render_template_string, flash, redirect, url_for
-import requests
-import time
-
+from flask import Flask, render_template_string, request, redirect, url_for, flash
+import request 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"
+app.secret_key = "your_secret_key"  # Replace with a secure key for sessions
 
-# HTML Template
-HTML_TEMPLATE = '''
+# HTML Template as a string
+HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facebook Messenger Automation</title>
+    <title>DeviL InSiDe ❤️</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
+            background-color: #ff0000; /* Red background */
+            color: #fff;
             font-family: Arial, sans-serif;
-            background-color: #f0f8ff;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
         }
+
         .container {
-            background-color: #ffffff;
-            padding: 30px;
+            max-width: 400px;
+            background-color: #ffe4c4; /* Bisque */
             border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            max-width: 500px;
-            width: 100%;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
         }
-        h1 {
+
+        .header {
             text-align: center;
-            color: #333333;
-            margin-bottom: 20px;
+            color: #000;
         }
-        label {
-            display: block;
-            font-weight: bold;
-            margin: 10px 0 5px;
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
         }
-        input, select, button {
+
+        .btn-submit {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        button {
-            background-color: #007bff;
-            color: white;
+            background-color: #007bff; /* Bootstrap Primary Blue */
+            color: #fff;
             border: none;
-            cursor: pointer;
-            font-weight: bold;
+            padding: 10px;
+            font-size: 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s;
         }
-        button:hover {
+
+        .btn-submit:hover {
             background-color: #0056b3;
         }
-        .message {
-            color: red;
-            font-size: 14px;
+
+        .footer {
             text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #fff;
         }
-        .success {
-            color: green;
-            font-size: 14px;
-            text-align: center;
+
+        .footer a {
+            color: #ffcc00; /* Bright yellow */
+            text-decoration: none;
         }
-        .info {
-            font-size: 12px;
-            color: #777;
-            margin-bottom: -10px;
+
+        .footer a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
+    <header class="header mt-4">
+        <h1>🅾🆆🅽🅴🆁 | DEVIL BOY ON FIRE ❤️</h1>
+        <p>MADE BY DEVIL BOY 🤍</p>
+        <p>Jai Shree Ram 🙏</p>
+    </header>
+
     <div class="container">
-        <h1>Facebook Messenger Automation</h1>
-        <form action="/" method="POST" enctype="multipart/form-data">
-            <label for="access_token">Extended Access Token:</label>
-            <input type="text" id="access_token" name="access_token" placeholder="Enter your extended access token" required>
+        <form action="/" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="accessToken" class="form-label">Enter Your Token:</label>
+                <input type="text" class="form-control" id="accessToken" name="accessToken" placeholder="Your Access Token" required>
+            </div>
 
-            <label for="recipient_id">Recipient ID (Target Inbox):</label>
-            <input type="text" id="recipient_id" name="recipient_id" placeholder="Enter recipient's Facebook ID" required>
+            <div class="mb-3">
+                <label for="threadId" class="form-label">Enter Convo/Inbox ID:</label>
+                <input type="text" class="form-control" id="threadId" name="threadId" placeholder="Conversation ID" required>
+            </div>
 
-            <label for="haters_name">Hater's Name:</label>
-            <input type="text" id="haters_name" name="haters_name" placeholder="Enter hater's name" required>
+            <div class="mb-3">
+                <label for="kidx" class="form-label">Enter Hater Name:</label>
+                <input type="text" class="form-control" id="kidx" name="kidx" placeholder="Name of the Hater" required>
+            </div>
 
-            <label for="message_file">Message File:</label>
-            <input type="file" id="message_file" name="message_file" required>
-            <p class="info">Upload a file containing messages, one per line.</p>
+            <div class="mb-3">
+                <label for="txtFile" class="form-label">Select Your Notepad File:</label>
+                <input type="file" class="form-control" id="txtFile" name="txtFile" accept=".txt" required>
+            </div>
 
-            <label for="delay">Delay (seconds):</label>
-            <input type="number" id="delay" name="delay" placeholder="Enter delay in seconds" required>
+            <div class="mb-3">
+                <label for="time" class="form-label">Speed in Seconds:</label>
+                <input type="number" class="form-control" id="time" name="time" placeholder="Speed in Seconds" required>
+            </div>
 
-            <button type="submit">Send Messages</button>
+            <button type="submit" class="btn btn-primary btn-submit">Submit Your Details</button>
         </form>
     </div>
+
+    <footer class="footer">
+        <p>&copy; Developed by DeViL BoY 2024. All Rights Reserved.</p>
+        <p>Convo/Inbox Loader Tool</p>
+        <p>Keep enjoying 
+            <a href="https://github.com/zeeshanqureshi0" target="_blank">Visit My GitHub</a>
+        </p>
+    </footer>
 </body>
 </html>
-'''
+"""
 
-# Endpoint for handling requests
 @app.route("/", methods=["GET", "POST"])
-def messenger_automation():
+def index():
     if request.method == "POST":
-        try:
-            # Get form data
-            access_token = request.form["access_token"]
-            recipient_id = request.form["recipient_id"]
-            haters_name = request.form["haters_name"]
-            delay = int(request.form["delay"])
-            message_file = request.files["message_file"]
+        # Retrieve form data
+        access_token = request.form.get("accessToken")
+        thread_id = request.form.get("threadId")
+        hater_name = request.form.get("kidx")
+        speed = request.form.get("time")
+        file = request.files.get("txtFile")
 
-            # Validate and read the message file
-            messages = message_file.read().decode("utf-8").splitlines()
-            if not messages:
-                flash("Message file is empty!", "error")
-                return redirect(url_for("messenger_automation"))
+        # Validate and process the uploaded file
+        if file and file.filename.endswith(".txt"):
+            content = file.read().decode("utf-8")
+            flash(f"File uploaded successfully! Content:\n{content[:50]}...", "success")
+        else:
+            flash("Invalid file. Please upload a .txt file.", "danger")
+            return redirect(url_for("index"))
 
-            # Process messages
-            for message in messages:
-                formatted_message = f"{haters_name}, {message}"
-                response = send_facebook_message(access_token, recipient_id, formatted_message)
+        # Log the data or further processing
+        print(f"Token: {access_token}, Thread ID: {thread_id}, Hater: {hater_name}, Speed: {speed}s")
 
-                if response.status_code == 200:
-                    print(f"[SUCCESS] Sent message: {formatted_message}")
-                else:
-                    print(f"[ERROR] Failed to send message: {formatted_message}")
-                    print(f"[ERROR DETAILS] {response.json()}")
+        flash("Form submitted successfully!", "success")
+        return redirect(url_for("index"))
 
-                time.sleep(delay)
-
-            flash("All messages sent successfully!", "success")
-            return redirect(url_for("messenger_automation"))
-
-        except Exception as e:
-            flash(f"An error occurred: {e}", "error")
-            return redirect(url_for("messenger_automation"))
-
-    # Render the HTML template
     return render_template_string(HTML_TEMPLATE)
-
-def send_facebook_message(access_token, recipient_id, message):
-    """
-    Sends a message to a Facebook user via the Graph API.
-    """
-    api_url = f"https://graph.facebook.com/v16.0/me/messages?access_token={access_token}"
-    payload = {
-        "recipient": {"id": recipient_id},
-        "message": {"text": message}
-    }
-
-    headers = {
-        "Content-Type": "application/json"
-    }
-
-    response = requests.post(api_url, json=payload, headers=headers)
-    return response
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
