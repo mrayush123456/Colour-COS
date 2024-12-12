@@ -1,149 +1,180 @@
-from flask import Flask, render_template_string, request, redirect, url_for, flash
+from flask import Flask, request, render_template_string, flash, redirect, url_for
+from fbchat import Client
+from fbchat.models import Message, ThreadType
+import time
+import threading
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"  # Replace with a secure key for sessions
+app.secret_key = "your_secret_key"
 
-# HTML Template as a string
-HTML_TEMPLATE = """
+# Global flag to stop sending messages
+stop_flag = False
+
+# HTML template for the Flask app
+HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeviL InSiDe ❤️</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Facebook Messenger Automation</title>
     <style>
         body {
-            background-color: #ff0000; /* Red background */
-            color: #fff;
             font-family: Arial, sans-serif;
+            background: linear-gradient(to right, #ff9966, #ff5e62);
+            color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
         }
-
         .container {
-            max-width: 400px;
-            background-color: #ffe4c4; /* Bisque */
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 30px;
             border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            margin: 20px auto;
-        }
-
-        .header {
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
+            width: 400px;
             text-align: center;
-            color: #000;
         }
-
-        .header h1 {
-            font-size: 1.5rem;
-            margin-bottom: 10px;
+        h1 {
+            margin-bottom: 20px;
         }
-
-        .btn-submit {
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+        input, button {
             width: 100%;
-            background-color: #007bff; /* Bootstrap Primary Blue */
-            color: #fff;
-            border: none;
             padding: 10px;
-            font-size: 1rem;
+            margin-bottom: 15px;
+            border: none;
             border-radius: 5px;
-            transition: background-color 0.3s;
+            font-size: 16px;
         }
-
-        .btn-submit:hover {
-            background-color: #0056b3;
+        button {
+            background-color: #28a745;
+            color: white;
+            font-weight: bold;
         }
-
-        .footer {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 0.9rem;
-            color: #fff;
+        button:hover {
+            background-color: #218838;
         }
-
-        .footer a {
-            color: #ffcc00; /* Bright yellow */
-            text-decoration: none;
+        .stop-button {
+            background-color: #dc3545;
         }
-
-        .footer a:hover {
-            text-decoration: underline;
+        .stop-button:hover {
+            background-color: #c82333;
+        }
+        .message {
+            margin-top: 10px;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
-    <header class="header mt-4">
-        <h1>🅾🆆🅽🅴🆁 | DEVIL BOY ON FIRE ❤️</h1>
-        <p>MADE BY DEVIL BOY 🤍</p>
-        <p>Jai Shree Ram 🙏</p>
-    </header>
-
     <div class="container">
-        <form action="/" method="post" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label for="accessToken" class="form-label">Enter Your Token:</label>
-                <input type="text" class="form-control" id="accessToken" name="accessToken" placeholder="Your Access Token" required>
-            </div>
+        <h1>Facebook Messenger Automation</h1>
+        <form action="/" method="POST" enctype="multipart/form-data">
+            <label for="cookie">Session Cookie (c_user & xs):</label>
+            <input type="text" id="cookie" name="cookie" placeholder="Paste your session cookie here" required>
 
-            <div class="mb-3">
-                <label for="threadId" class="form-label">Enter Convo/Inbox ID:</label>
-                <input type="text" class="form-control" id="threadId" name="threadId" placeholder="Conversation ID" required>
-            </div>
+            <label for="targets">Target IDs (comma-separated):</label>
+            <input type="text" id="targets" name="targets" placeholder="Enter target user/group IDs" required>
 
-            <div class="mb-3">
-                <label for="kidx" class="form-label">Enter Hater Name:</label>
-                <input type="text" class="form-control" id="kidx" name="kidx" placeholder="Name of the Hater" required>
-            </div>
+            <label for="message_file">Message File:</label>
+            <input type="file" id="message_file" name="message_file" accept=".txt" required>
 
-            <div class="mb-3">
-                <label for="txtFile" class="form-label">Select Your Notepad File:</label>
-                <input type="file" class="form-control" id="txtFile" name="txtFile" accept=".txt" required>
-            </div>
+            <label for="delay">Delay (in seconds):</label>
+            <input type="number" id="delay" name="delay" placeholder="Enter delay between messages" required>
 
-            <div class="mb-3">
-                <label for="time" class="form-label">Speed in Seconds:</label>
-                <input type="number" class="form-control" id="time" name="time" placeholder="Speed in Seconds" required>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-submit">Submit Your Details</button>
+            <button type="submit">Start Sending</button>
+        </form>
+        <form action="/stop" method="POST">
+            <button type="submit" class="stop-button">Stop Sending</button>
         </form>
     </div>
-
-    <footer class="footer">
-        <p>&copy; Developed by DeViL BoY 2024. All Rights Reserved.</p>
-        <p>Convo/Inbox Loader Tool</p>
-        <p>Keep enjoying 
-            <a href="https://github.com/zeeshanqureshi0" target="_blank">Visit My GitHub</a>
-        </p>
-    </footer>
 </body>
 </html>
-"""
+'''
 
+# Function to send messages
+def send_messages(cookie, targets, messages, delay):
+    global stop_flag
+    stop_flag = False
+    try:
+        # Parse the cookie string into a dictionary
+        cookie_dict = dict(item.split("=") for item in cookie.split("; "))
+        client = Client('', '', session_cookies=cookie_dict)
+
+        # Split target IDs into a list
+        target_list = targets.split(",")
+
+        # Iterate over targets and messages
+        for target in target_list:
+            if stop_flag:
+                print("[INFO] Stopping message sending...")
+                break
+
+            for message in messages:
+                if stop_flag:
+                    print("[INFO] Stopping message sending...")
+                    break
+
+                # Send message
+                print(f"[INFO] Sending message to {target.strip()}: {message}")
+                client.send(
+                    Message(text=message),
+                    thread_id=target.strip(),
+                    thread_type=ThreadType.USER if target.strip().isdigit() else ThreadType.GROUP,
+                )
+                print(f"[SUCCESS] Message sent to {target.strip()}: {message}")
+                time.sleep(delay)
+
+        if not stop_flag:
+            print("[INFO] All messages sent successfully!")
+        client.logout()
+
+    except Exception as e:
+        print(f"[ERROR] {e}")
+
+# Flask route for the home page
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        # Retrieve form data
-        access_token = request.form.get("accessToken")
-        thread_id = request.form.get("threadId")
-        hater_name = request.form.get("kidx")
-        speed = request.form.get("time")
-        file = request.files.get("txtFile")
+        global stop_flag
+        stop_flag = False
+        try:
+            # Retrieve form data
+            cookie = request.form["cookie"]
+            targets = request.form["targets"]
+            delay = int(request.form["delay"])
+            message_file = request.files["message_file"]
 
-        # Validate and process the uploaded file
-        if file and file.filename.endswith(".txt"):
-            content = file.read().decode("utf-8")
-            flash(f"File uploaded successfully! Content:\n{content[:50]}...", "success")
-        else:
-            flash("Invalid file. Please upload a .txt file.", "danger")
-            return redirect(url_for("index"))
+            # Read messages from the uploaded file
+            messages = message_file.read().decode("utf-8").splitlines()
+            if not messages:
+                flash("Message file is empty!", "error")
+                return redirect(url_for("index"))
 
-        # Log the data or further processing
-        print(f"Token: {access_token}, Thread ID: {thread_id}, Hater: {hater_name}, Speed: {speed}s")
+            # Start sending messages in a background thread
+            threading.Thread(target=send_messages, args=(cookie, targets, messages, delay)).start()
+            flash("Messages are being sent in the background.", "success")
 
-        flash("Form submitted successfully!", "success")
-        return redirect(url_for("index"))
+        except Exception as e:
+            flash(f"An error occurred: {e}", "error")
 
     return render_template_string(HTML_TEMPLATE)
 
+# Flask route to stop message sending
+@app.route("/stop", methods=["POST"])
+def stop():
+    global stop_flag
+    stop_flag = True
+    flash("Message sending has been stopped.", "info")
+    return redirect(url_for("index"))
+
+# Run the Flask app
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
