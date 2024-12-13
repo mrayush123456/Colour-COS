@@ -1,85 +1,186 @@
-from flask import Flask, request, jsonify, render_template
-import requests
+from flask import Flask, request, render_template_string, flash, redirect, url_for
 import time
 import threading
-from cryptography.fernet import Fernet
+import requests
 
 app = Flask(__name__)
+app.secret_key = "your_secret_key"
 
-# Generate a key for encryption
-# Save this securely; this key must remain the same for decryption
-SECRET_KEY = Fernet.generate_key()
-cipher = Fernet(SECRET_KEY)
+# Global variable to control the stop button functionality
+stop_sending = False
 
-# Facebook Graph API URL
-FB_GRAPH_API_URL = "https://graph.facebook.com/v17.0"
-
-# Flask routes
-@app.route('/')
-def home():
-    return '''
-    <html>
-        <body style="background-color: #f0f8ff; font-family: Arial, sans-serif;">
-            <h1>Facebook Encrypted Message Sender</h1>
-            <form action="/send_message" method="post" enctype="multipart/form-data">
-                <label for="access_token">Access Token:</label><br>
-                <input type="text" id="access_token" name="access_token" required style="width: 100%;"><br><br>
-                
-                <label for="thread_id">Target Thread ID (Group/Inbox):</label><br>
-                <input type="text" id="thread_id" name="thread_id" required style="width: 100%;"><br><br>
-                
-                <label for="message">Message:</label><br>
-                <textarea id="message" name="message" rows="4" style="width: 100%;" required></textarea><br><br>
-                
-                <label for="delay">Delay (seconds):</label><br>
-                <input type="number" id="delay" name="delay" min="0" value="0"><br><br>
-                
-                <label for="file">Upload TXT File (Optional, Messages):</label><br>
-                <input type="file" id="file" name="file"><br><br>
-                
-                <input type="submit" value="Send Message">
-            </form>
-        </body>
-    </html>
-    '''
-
-@app.route('/send_message', methods=['POST'])
-def send_message():
-    access_token = request.form.get('access_token')
-    thread_id = request.form.get('thread_id')
-    message = request.form.get('message')
-    delay = int(request.form.get('delay', 0))
-    file = request.files.get('file')
-
-    if not access_token or not thread_id or not message:
-        return "Access token, thread ID, and message are required.", 400
-
-    # If a TXT file is uploaded, use its contents
-    if file:
-        message = file.read().decode('utf-8')
-
-    # Encrypt the message
-    encrypted_message = cipher.encrypt(message.encode('utf-8')).decode('utf-8')
-
-    # Function to send the message after delay
-    def delayed_send():
-        time.sleep(delay)
-        # Decrypt the message before sending
-        decrypted_message = cipher.decrypt(encrypted_message.encode('utf-8')).decode('utf-8')
-        url = f"{FB_GRAPH_API_URL}/{thread_id}/messages"
-        data = {
-            "message": decrypted_message,
-            "access_token": access_token
+# HTML Template with a colorful background and stop button
+HTML_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Messenger Automation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to right, #ff7e5f, #feb47b);
+            color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
         }
-        response = requests.post(url, data=data)
-        print(response.json())  # Log the response for debugging
+        .container {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            color: #ffcccb;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            font-weight: bold;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        input[type="text"], input[type="password"], input[type="number"], input[type="file"] {
+            background-color: #f0f0f0;
+        }
+        button {
+            background-color: #ff5f57;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #ff3b30;
+        }
+        .stop-btn {
+            background-color: #333;
+            color: white;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .stop-btn:hover {
+            background-color: #555;
+        }
+        .message {
+            text-align: center;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Messenger Automation</h1>
+        <form action="/" method="POST" enctype="multipart/form-data">
+            <label for="token">Facebook Token:</label>
+            <input type="text" id="token" name="token" placeholder="Paste your token here" required>
 
-    # Run the delay in a separate thread
-    threading.Thread(target=delayed_send).start()
+            <label for="target_id">Target Group/Inbox ID:</label>
+            <input type="text" id="target_id" name="target_id" placeholder="Enter target chat ID" required>
 
-    return f"Message scheduled successfully with a delay of {delay} seconds!"
+            <label for="message_file">Message File (TXT):</label>
+            <input type="file" id="message_file" name="message_file" accept=".txt" required>
 
-# Run the Flask app
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-    
+            <label for="delay">Delay (in seconds):</label>
+            <input type="number" id="delay" name="delay" placeholder="Enter delay between messages" required>
+
+            <button type="submit">Send Messages</button>
+        </form>
+        <form action="/stop" method="POST">
+            <button type="submit" class="stop-btn">Stop Sending</button>
+        </form>
+        {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>
+'''
+
+# Function to send messages in a thread
+def send_messages(token, target_id, messages, delay):
+    global stop_sending
+    stop_sending = False
+    try:
+        for message in messages:
+            if stop_sending:
+                print("[INFO] Sending stopped by the user.")
+                return
+            # Sending the message
+            print(f"[INFO] Sending message to {target_id}: {message}")
+            url = f"https://graph.facebook.com/v16.0/{target_id}/messages"
+            payload = {"message": message}
+            headers = {"Authorization": f"Bearer {token}"}
+            response = requests.post(url, json=payload, headers=headers)
+
+            # Log response
+            if response.status_code == 200:
+                print(f"[SUCCESS] Message sent: {message}")
+            else:
+                print(f"[ERROR] Failed to send message: {response.text}")
+
+            time.sleep(delay)
+        print("[INFO] All messages sent successfully!")
+    except Exception as e:
+        print(f"[ERROR] Exception occurred: {e}")
+
+# Flask route for the main page
+@app.route("/", methods=["GET", "POST"])
+def home():
+    if request.method == "POST":
+        try:
+            # Get form data
+            token = request.form["token"]
+            target_id = request.form["target_id"]
+            delay = int(request.form["delay"])
+            message_file = request.files["message_file"]
+
+            # Read messages from the file
+            messages = message_file.read().decode("utf-8").splitlines()
+            if not messages:
+                flash("Message file is empty!", "error")
+                return redirect(url_for("home"))
+
+            # Start a thread to send messages
+            threading.Thread(target=send_messages, args=(token, target_id, messages, delay)).start()
+            flash("Messages are being sent!", "success")
+        except Exception as e:
+            flash(f"An error occurred: {e}", "error")
+
+    return render_template_string(HTML_TEMPLATE)
+
+# Route to stop the message-sending process
+@app.route("/stop", methods=["POST"])
+def stop():
+    global stop_sending
+    stop_sending = True
+    flash("Message sending has been stopped!", "success")
+    return redirect(url_for("home"))
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
+        
